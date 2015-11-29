@@ -1,4 +1,4 @@
-from socketserver import TCPServer, StreamRequestHandler
+﻿from socketserver import TCPServer, StreamRequestHandler
 from socket import *
 from time import ctime, sleep
 import sys

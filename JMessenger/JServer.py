@@ -14,6 +14,7 @@ inputs = Queue()
 sendsock = socket(AF_INET,SOCK_STREAM)
 identifier = re.compile(r'[a-zA-Z0-9_]{4,12}')
 db=ServerDB()
+
     
 class ServerHandler(StreamRequestHandler):
     def jointry(self,line):
@@ -40,6 +41,7 @@ class ServerHandler(StreamRequestHandler):
             return 'LOGINR FAIL INVALIDID'
         if identifier.fullmatch(pw) is None:
             return 'LOGINR FAIL INVALIDPW'
+        print("Set debug to",add)
         return db.loginuser(id,pw,add)
 
     def contry(self,line,add):
@@ -92,6 +94,7 @@ class ServerHandler(StreamRequestHandler):
 def main():
     print("Start Server")
     tcpServ = TCPServer(ADDR, ServerHandler)
+    
     tcpServ.serve_forever();
 
 if __name__ == '__main__':

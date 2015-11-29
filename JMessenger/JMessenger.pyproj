@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>44c72c70-b75b-438e-9c0a-374b494d3721</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>JServer.py</StartupFile>
+    <StartupFile>JClient.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>

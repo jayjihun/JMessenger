@@ -1,4 +1,4 @@
-from socketserver import (TCPServer as TCP, StreamRequestHandler as SRH)
+from socketserver import TCPServer, StreamRequestHandler
 from socket import *
 from time import ctime, sleep
 import sys
@@ -7,72 +7,91 @@ from threading import Thread
 import re
 from ServerDB import ServerDB
 
-HOST = '175.198.72.171'
+HOST = '175.198.72.181'
 PORT = 11557
 ADDR = (HOST,PORT)
 inputs = Queue()
 sendsock = socket(AF_INET,SOCK_STREAM)
 identifier = re.compile(r'[a-zA-Z0-9_]{4,12}')
-
-class Message(object):
-    def __init__(self,line,ip_from):
-        self.line = line
-        self.ip_from = ip_from
-
-class WorkerThread(Thread):
-    def __init__(self):
-        Thread.__init__(self)
-        self.db = None
-
+db=ServerDB()
+    
+class ServerHandler(StreamRequestHandler):
     def jointry(self,line):
-        id = line.split(' ')[1]
-        pw = line.split(' ')[2]
+        try:
+            id = line.split(' ')[1]
+            pw = line.split(' ')[2]
+        except:
+            return 'JOINR FAIL INVAL'
         if identifier.fullmatch(id) is None:
             return 'JOINR FAIL INVALIDID'
         if identifier.fullmatch(pw) is None:
             return 'JOINR FAIL INVALIDPW'
-        if self.db.joinuser(id,pw):
+        if db.joinuser(id,pw):
             return 'JOINR SUCCESS'
         return 'JOINR FAIL DUPLICATE'
 
+    def login(self,line,add):
+        try:
+            id = line.split(' ')[1]
+            pw = line.split(' ')[2]
+        except:
+            return 'LOGINR FAIL INVAL'
+        if identifier.fullmatch(id) is None:
+            return 'LOGINR FAIL INVALIDID'
+        if identifier.fullmatch(pw) is None:
+            return 'LOGINR FAIL INVALIDPW'
+        return db.loginuser(id,pw,add)
 
-    def execute(self,line,ip_from):
+    def contry(self,line,add):
+        try:
+            otherid = line.split(' ')[1]
+        except:
+            return 'CONR FAIL INVAL'           
+        if identifier.fullmatch(otherid) is None:
+            return 'CONR FAIL INVALIDID'
+        otheradd = db.conuser(otherid)
+        if type(otheradd) == str:
+            return otheradd
+        return 'CONR SUCCESS %s %d'%otheradd
+
+    def logout(self,line):
+        try:
+            id = line.split(' ')[1]
+        except:
+            return 'LOGOUTR FAIL'
+        if identifier.fullmatch(id) is None:
+            return 'LGOUTR FAIL INVALIDID'
+        return db.logoutuser(id)
+
+    def process(self, line, add):
         try:
             code = line.split(' ')[0]
-            print(code)
             if code == 'JOIN':
                 return self.jointry(line)
-        except:
+            elif code == 'LOGIN':
+                return self.login(line,add)
+            elif code == 'CON':
+                return self.contry(line,add)
+            elif code == 'LOGOUT':
+                return self.logout(line)
+        except Exception as e:
+            print(e.args)
             return 'NOT'
-        return 'hi'
+        return 'NOT'
 
-    def run(self):
-        self.db = ServerDB()
-        while True:
-            while not inputs.empty():
-                message = inputs.get()
-                line = message.line
-                ip_from = message.ip_from
-                reply = self.execute(line,ip_from)
-                print('Reply :',reply)
-                sendsock.connect(ip_from)
-                sendsock.send(bytes(reply,'utf-8'))
-                sendsock.close()
-    
-class ServerHandler(SRH):
+
     def handle(self):
+        print("[REQUEST arrived]")
         add = self.client_address
         content = self.rfile.readline().strip().decode('utf-8')
-        message = Message(content,add)
-        inputs.put(message)
         print("IP : %s, Message : %s"%(add,content))
-
-
+        reply = self.process(content, add)
+        print("Reply :",reply)
+        self.wfile.write(bytes(reply,'utf-8'))
 
 def main():
-    tcpServ = TCP(ADDR, ServerHandler)
-    wthread = WorkerThread()
-    wthread.start()
+    print("Start Server")
+    tcpServ = TCPServer(ADDR, ServerHandler)
     tcpServ.serve_forever();
 
 if __name__ == '__main__':

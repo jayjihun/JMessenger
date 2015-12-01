@@ -29,21 +29,73 @@ def poke(addr,message):
     return rcv
 
 class ListenThread(Thread):
-    def __main__(self):
+    def __init__(self):
         Thread.__init__(self)
+        self.loggedin = False        
         self.port = 0
+        self.keepgoing = True
+        self.id=None
+        self.pw=None
 
-    def serve(self,line):
-        print("RECEIVED :",line)
+    def send(self,addr, message):
+        soc = socket(AF_INET, SOCK_STREAM)
+        soc.connect(addr)
+        soc.send(bytes(message+"\n",'utf-8'))
+        print("[LISTENER] Send :",message)
+        soc.close()
+
+    def poke(self, addr,message):
+        soc = socket(AF_INET, SOCK_STREAM)
+        soc.connect(addr)
+        soc.send(bytes(message+"\n",'utf-8'))
+        print("[LISTENER] Send :",message)
+        rcv = soc.recv(BUFSIZE).decode('utf-8')
+        print("[LISTENER] Received :",rcv)
+        soc.close()
+        return rcv
+
+    def dummy(self,line):
+        print('DUMMY received')
+        pass
+
+    def througher(self,line):
+        try:
+            print(1)
+            ip = line.split(' ')[2]
+            print(2)
+            port = int(line.split(' ')[3])
+            print(3)
+            addr = (ip,port)
+            print(4)
+            print(addr)
+            send(addr,'THRU HELLO')
+            print(5)
+        except Exception as e:
+            print("Error detected!!")
+            print(e.args)
+
+
+    def process(self,line):
+        funcs={'CONR':self.througher,'THRU':self.dummy}
+        try:
+            code = line.split(' ')[0]
+            funcs[code](line)
+        except KeyError:
+            pass
+        except Exception as e:
+            print(e.args)
+            pass
 
     def listen(self):
         soc = socket(AF_INET, SOCK_STREAM)
+        print("Start Listening. Port :",self.port)
         soc.bind(('',self.port))
         soc.listen()
-        while True:
+        while keepgoing:
             acc,add = soc.accept()
             rcv = acc.recv(BUFSIZE).decode('utf-8')
-            self.serve(rcv)
+            print('RECEIVED :',rcv)
+            self.process(rcv)
             acc.close()
 
     def login(self):
@@ -80,86 +132,121 @@ class ListenThread(Thread):
                 continue
             print("Log in success.")
             self.port = port
-            global loggedin
-            loggedin = True
+            self.id=id
+            self.pw=pw
+            self.loggedin = True
             break
 
     def run(self):
-
         self.login()
         self.listen()
 
-            
+    def getid(self):
+        if not self.loggedin:
+            return None
+        else:
+            return (self.id,self.pw)
 
-while True:
-    op = input("Select Menu : 1. Join, 2. Login > ")
-    if op == "1": #Join
-        newid = input("Type new ID > ")
-        newpw = input("Type new PW > ")
-        if identifier.fullmatch(newid) is None:
-            print("Invalid ID")
-            continue
-        if identifier.fullmatch(newpw) is None:
-            print("Invalid PW")
-            continue
+class Client(object):
+    def __init__(self):
+        self.id=None
+        self.pw=None
+        pass
+
+    def send(self,addr, message):
         soc = socket(AF_INET, SOCK_STREAM)
-        message = "JOIN %s %s"%(newid, newpw)
-        soc.connect(SERVER)
+        soc.connect(addr)
         soc.send(bytes(message+"\n",'utf-8'))
-        rcv = soc.recv(BUFSIZE).decode('utf-8')
+        print("[CLIENT] Send :",message)
         soc.close()
 
-        try:
-            op,code = rcv.split(' ')[0],rcv.split(' ')[1]
-        except Exception as e:
-            print(e.args)
-            print("UNKNOWN ERROR1")
-            continue
-        if op != 'JOINR':
-            print("UNKNOWN ERROR2")
-            continue
-        if code == 'SUCCESS':
-            print("Join success.")
-            continue
-        else:
-            print("Join Failed :",rcv.split(' ')[-1])
-            continue
+    def poke(self, addr,message):
+        soc = socket(AF_INET, SOCK_STREAM)
+        soc.connect(addr)
+        soc.send(bytes(message+"\n",'utf-8'))
+        print("[CLIENT] Send :",message)
+        rcv = soc.recv(BUFSIZE).decode('utf-8')
+        print("[CLIENT] Received :",rcv)
+        soc.close()
+        return rcv
+
+    def greet(self):
+        while True:
+            op = input("Select Menu : 1. Join, 2. Login > ")
+            if op == "1": #Join
+                newid = input("Type new ID > ")
+                newpw = input("Type new PW > ")
+                if identifier.fullmatch(newid) is None:
+                    print("Invalid ID")
+                    continue
+                if identifier.fullmatch(newpw) is None:
+                    print("Invalid PW")
+                    continue                
+                message = "JOIN %s %s"%(newid, newpw)
+                rcv = self.poke(SERVER, message)
+                op,code = rcv.split(' ')[0],rcv.split(' ')[1]
+                # try:                    
+                '''
+                except Exception as e:
+                    print(e.args)
+                    print("UNKNOWN ERROR1")
+                    continue
+                if op != 'JOINR':
+                    print("UNKNOWN ERROR2")
+                    continue
+                    '''
+                if code == 'SUCCESS':
+                    print("Join success.")
+                    continue
+                else:
+                    print("Join Failed :",rcv.split(' ')[-1])
+                    continue
             
-    elif op == "2":#Login
-        break
-       
-listener = ListenThread()
-listener.start()
-while not loggedin:
-    pass        
+            elif op == "2":#Login
+                break
 
-while True:
-    op = input("Select Menu : 1. Chat, 2. Log out > ")
-    if op=='1':
-        otherid = input("Select his ID > ")
-        message = "CON %s"%(otherid,)
-        rcv = poke(SERVER,message)
-        try:
-            op,code = tuple(rcv.split(' ')[0:2])
-        except Exception as e:
-            print(e.args)
-            print("UNKNOWN ERROR1")
-            continue
-        if op != 'CONR':
-            print("UNKNOWN ERROR2")
-            continue
-        if code == 'SUCCESS':
-            print("Con info received.")
-            info = ' '.join(rcv.split(' ')[2:])
-            addr = (info.split(' ')[0],int(info.split(' ')[1]))
-            print('Info :',info)
-            for i in range(1,5):
-                send(addr,'HI YOU ALRIGHT?')
-                sleep(3)
-            continue
-        else:
-            print("Con Failed :",rcv.split(' ')[-1])
-            continue
+    def memberaction(self):
+        while True:
+            op = input("Select Menu : 1. Chat, 2. Logout > ")
+            if op=='1':
+                otherid = input("Select his ID > ")
+                message = "CON %s %s"%(self.id, otherid)
+                rcv = self.poke(SERVER,message)
+                try:
+                    op,code = tuple(rcv.split(' ')[0:2])
+                except Exception as e:
+                    print(e.args)
+                    print("UNKNOWN ERROR1")
+                    continue
+                if op != 'CONR':
+                    print("UNKNOWN ERROR2")
+                    continue
+                if code == 'SUCCESS':
+                    info = ' '.join(rcv.split(' ')[2:])
+                    dstaddr = (info.split(' ')[0],int(info.split(' ')[1]))
+                    print('Info :',info)
+                    self.send(dstaddr,'THRU HELLO')
+                    self.send(dstaddr,'MES This is real message. Hello.')
+                    continue
+                else:
+                    print("Con Failed :",rcv.split(' ')[-1])
+                    continue
 
-    elif op=='2':
-        pass
+            elif op=='2':
+                break
+
+    def start(self):
+        self.greet()
+        self.listener = ListenThread()
+        self.listener.start()
+
+        while True:
+            a = self.listener.getid()
+            if a is not None:
+                self.id,self.pw=a
+                break
+        self.memberaction()
+
+
+client = Client()
+client.start()

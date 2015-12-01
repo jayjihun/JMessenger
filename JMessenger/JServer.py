@@ -11,13 +11,20 @@ HOST = '175.198.72.181'
 PORT = 11557
 ADDR = (HOST,PORT)
 inputs = Queue()
-sendsock = socket(AF_INET,SOCK_STREAM)
 identifier = re.compile(r'[a-zA-Z0-9_]{4,12}')
 db=ServerDB()
 
+def send(addr, message: str):
+    soc = socket()
+    soc.connect(addr)
+    soc.send(bytes(message,'utf-8'))
+    soc.close()
+
+
     
 class ServerHandler(StreamRequestHandler):
-    def jointry(self,line):
+
+    def jointry(self,line,add):
         try:
             id = line.split(' ')[1]
             pw = line.split(' ')[2]
@@ -46,39 +53,35 @@ class ServerHandler(StreamRequestHandler):
 
     def contry(self,line,add):
         try:
-            otherid = line.split(' ')[1]
+            srcid,dstid = tuple(line.split(' ')[1:3])
         except:
             return 'CONR FAIL INVAL'           
-        if identifier.fullmatch(otherid) is None:
+        if identifier.fullmatch(dstid) is None:
             return 'CONR FAIL INVALIDID'
-        otheradd = db.conuser(otherid)
-        if type(otheradd) == str:
-            return otheradd
-        return 'CONR SUCCESS %s %d'%otheradd
+        dstadd = db.conuser(dstid)
+        if type(dstadd) == str:
+            return dstadd
+        srcadd = db.conuser(srcid)
+        message2 = 'CONR SUCCESS %s %d'%srcadd
+        send(dstadd,message2)
+        return 'CONR SUCCESS %s %d'%dstadd
 
-    def logout(self,line):
+    def logout(self,line,add):
         try:
             id = line.split(' ')[1]
         except:
             return 'LOGOUTR FAIL'
         if identifier.fullmatch(id) is None:
-            return 'LGOUTR FAIL INVALIDID'
+            return 'LOGOUTR FAIL INVALIDID'
         return db.logoutuser(id)
 
     def process(self, line, add):
+        funcs = {'JOIN':self.jointry, 'LOGIN':self.login, 'CON':self.contry, 'LOGOUT':self.logout}
         try:
             code = line.split(' ')[0]
-            if code == 'JOIN':
-                return self.jointry(line)
-            elif code == 'LOGIN':
-                return self.login(line,add)
-            elif code == 'CON':
-                return self.contry(line,add)
-            elif code == 'LOGOUT':
-                return self.logout(line)
+            return funcs[code](line,add)
         except Exception as e:
             print(e.args)
-            return 'NOT'
         return 'NOT'
 
 
